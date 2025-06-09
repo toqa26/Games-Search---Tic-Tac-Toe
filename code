@@ -1,0 +1,193 @@
+import pygame
+import sys
+
+# Constants
+X = "X"
+O = "O"
+EMPTY = None
+
+# Initialize pygame
+pygame.init()
+
+# Set up the display
+WIDTH = 400
+HEIGHT = 400
+BG_COLOR = (255, 192, 203)
+LINE_COLOR = (0, 0, 0)
+MARK_COLOR = (0, 0, 0)
+
+window = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Tic-Tac-Toe")
+
+# Returns the starting state of the board
+def initial_state():
+    return [[EMPTY, EMPTY, EMPTY],
+            [EMPTY, EMPTY, EMPTY],
+            [EMPTY, EMPTY, EMPTY]]
+
+# Returns the player who has the next turn on a board
+def player(board):
+    x_count = sum(row.count(X) for row in board)
+    o_count = sum(row.count(O) for row in board)
+    if x_count == o_count:
+        return X
+    else:
+        return O
+
+# Returns a set of all possible actions (i, j) available on the board
+def actions(board):
+    possible_actions = set()
+    for i in range(3):
+        for j in range(3):
+            if board[i][j] == EMPTY:
+                possible_actions.add((i, j))
+    return possible_actions
+
+# Returns the board that results from making move (i, j) on the board
+def result(board, action):
+    if action not in actions(board):
+        raise ValueError("Invalid action!")
+    new_board = [row[:] for row in board]
+    new_board[action[0]][action[1]] = player(board)
+    return new_board
+
+# Returns the winner of the game, if there is one
+def winner(board):
+    for i in range(3):
+        if board[i][0] == board[i][1] == board[i][2] != EMPTY:
+            return board[i][0]
+    for j in range(3):
+        if board[0][j] == board[1][j] == board[2][j] != EMPTY:
+            return board[0][j]
+    if board[0][0] == board[1][1] == board[2][2] != EMPTY:
+        return board[0][0]
+    if board[0][2] == board[1][1] == board[2][0] != EMPTY:
+        return board[0][2]
+    return None
+
+# Returns True if the game is over, False otherwise
+def terminal(board):
+    if winner(board) is not None:
+        return True
+    for row in board:
+        if EMPTY in row:
+            return False
+    return True
+
+# Returns 1 if X has won the game, -1 if O has won, 0 otherwise
+def utility(board):
+    if winner(board) == X:
+        return 1
+    elif winner(board) == O:
+        return -1
+    else:
+        return 0
+
+# Returns the optimal action for the current player on the board
+def minimax(board):
+    if terminal(board):
+        return None
+
+    if player(board) == X:
+        best_value = float("-inf")
+        best_action = None
+        for action in actions(board):
+            value = min_value(result(board, action))
+            if value > best_value:
+                best_value = value
+                best_action = action
+    else:
+        best_value = float("inf")
+        best_action = None
+        for action in actions(board):
+            value = max_value(result(board, action))
+            if value < best_value:
+                best_value = value
+                best_action = action
+
+    return best_action
+
+# Returns the minimum value that the opponent can achieve
+def min_value(board):
+    if terminal(board):
+        return utility(board)
+
+    v = float("inf")
+    for action in actions(board):
+        v = min(v, max_value(result(board, action)))
+    return v
+
+# Returns the maximum value that the current player can achieve
+def max_value(board):
+    if terminal(board):
+        return utility(board)
+
+    v = float("-inf")
+    for action in actions(board):
+        v = max(v, min_value(result(board, action)))
+    return v
+
+# Draw the Tic-Tac-Toe board
+def draw_board(board):
+    window.fill(BG_COLOR)
+    pygame.draw.line(window, LINE_COLOR, (WIDTH / 3, 0), (WIDTH / 3, HEIGHT), 5)
+    pygame.draw.line(window, LINE_COLOR, (2 * WIDTH / 3, 0), (2 * WIDTH / 3, HEIGHT), 5)
+    pygame.draw.line(window, LINE_COLOR, (0, HEIGHT / 3), (WIDTH, HEIGHT / 3), 5)
+    pygame.draw.line(window, LINE_COLOR, (0, 2 * HEIGHT / 3), (WIDTH, 2 * HEIGHT / 3), 5)
+
+    for i in range(3):
+        for j in range(3):
+            if board[i][j] == X:
+                pygame.draw.line(window, MARK_COLOR, (j * WIDTH / 3 + 50, i * HEIGHT / 3 + 50),
+                                 ((j + 1) * WIDTH / 3 - 50, (i + 1) * HEIGHT / 3 - 50), 5)
+                pygame.draw.line(window, MARK_COLOR, ((j + 1) * WIDTH / 3 - 50, i * HEIGHT / 3 + 50),
+                                 (j * WIDTH / 3 + 50, (i + 1) * HEIGHT / 3 - 50), 5)
+            elif board[i][j] == O:
+                pygame.draw.circle(window, MARK_COLOR, (int(j * WIDTH / 3 + WIDTH / 6), int(i * HEIGHT / 3 + HEIGHT / 6)), 50, 5)
+
+    pygame.display.update()
+
+# Main game loop
+def play_game():
+    board = initial_state()
+    draw_board(board)
+
+    while not terminal(board):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN and player(board) == X:
+                mouseX = event.pos[0]
+                mouseY = event.pos[1]
+                click_row = int(mouseY // (HEIGHT / 3))
+                click_col = int(mouseX // (WIDTH / 3))
+                action = (click_row, click_col)
+
+                if action in actions(board):
+                    board = result(board, action)
+                    draw_board(board)
+
+                    if terminal(board):
+                        break
+
+                    # AI's turn
+                    ai_action = minimax(board)
+                    if ai_action is not None:
+                        board = result(board, ai_action)
+                        draw_board(board)
+
+    # Game over
+    winning_player = winner(board)
+    if winning_player is None:
+        print("It's a tie!")
+    else:
+        print(f"{winning_player} wins!")
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                sys.exit()
+
+# Start the game
+play_game()
